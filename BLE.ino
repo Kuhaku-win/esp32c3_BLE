@@ -3,8 +3,8 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
-BLEServer *pServer = nullptr;
-BLECharacteristic *pCharacteristic = nullptr;
+BLEServer *ptServer = nullptr;
+BLECharacteristic *ptCharacteristic = nullptr;
 bool deviceConnected = false;
 
 // UUID定义
@@ -12,12 +12,12 @@ bool deviceConnected = false;
 #define CHARACTERISTIC_UUID "9e7d657e-4a8d-4b8c-9259-458eb255eb1e"
 
 // 连接状态回调
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
+class Callback: public BLEServerCallbacks {
+    void onConnect(BLEServer* ptServer) {
         deviceConnected = true;
     }
 
-    void onDisconnect(BLEServer* pServer) {
+    void onDisconnect(BLEServer* ptServer) {
         deviceConnected = false;
     }
 };
@@ -26,43 +26,44 @@ void setup() {
     Serial.begin(115200);
     BLEDevice::init("ESP32C3_BLE");  // 设置设备名称
 
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks());
+    ptServer = BLEDevice::createServer();
+    ptServer->setCallbacks(new Callback());
     
-    BLEService *pService = pServer->createService(SERVICE_UUID);
-    
-    pCharacteristic = pService->createCharacteristic(
+    BLEService *pService = ptServer->createService(SERVICE_UUID);
+
+    //配置Characteristic
+    ptCharacteristic = pService->createCharacteristic(
         CHARACTERISTIC_UUID,
         BLECharacteristic::PROPERTY_READ | 
         BLECharacteristic::PROPERTY_WRITE | 
         BLECharacteristic::PROPERTY_NOTIFY
     );
 
-    pCharacteristic->addDescriptor(new BLE2902());
+    ptCharacteristic->addDescriptor(new BLE2902());
     pService->start();
     
-    BLEAdvertising *pAdvertising = pServer->getAdvertising();
-    pAdvertising->start();
-    Serial.println("BLE Server is ready. Connect with your phone.");
+    BLEAdvertising *pAdvertising = ptServer->getAdvertising();
+    pAdvertising->start();//开始广播
+    Serial.println("开始连接");
 }
 
 void loop() {
     if (deviceConnected) {
         // 读取手机串口输入
-        if (pCharacteristic->getValue().length() > 0) {
-            String message = pCharacteristic->getValue().c_str();
+        if (ptCharacteristic->getValue().length() > 0) {
+            String message = ptCharacteristic->getValue().c_str();
             Serial.print("From BLE: ");
             Serial.println(message);  // 在电脑串口打印手机输入内容
-            pCharacteristic->setValue("");  // 清空特征值
+            ptCharacteristic->setValue("");  // 清空特征值
         }
 
         // 从电脑串口发送数据到手机
         if (Serial.available()) {
-            String pcInput = Serial.readString();
-            pCharacteristic->setValue(pcInput.c_str());
-            pCharacteristic->notify();  // 通知手机有新数据
+            String mes = Serial.readString();
+            ptCharacteristic->setValue(mes.c_str());
+            ptCharacteristic->notify();  // 通知手机有新数据
             Serial.print("Sent to BLE: ");
-            Serial.println(pcInput);  // 打印发送到手机的数据
+            Serial.println(mes);  // 打印发送到手机的数据
         }
     }
 }
